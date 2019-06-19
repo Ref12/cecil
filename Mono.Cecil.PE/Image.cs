@@ -23,6 +23,7 @@ namespace Mono.Cecil.PE {
 
 		public Disposable<Stream> Stream;
 		public string FileName;
+		public bool FromDump;
 
 		public ModuleKind Kind;
 		public string RuntimeVersion;
@@ -99,6 +100,8 @@ namespace Mono.Cecil.PE {
 
 		public uint ResolveVirtualAddressInSection (RVA rva, Section section)
 		{
+			if (FromDump)
+				return rva;
 			return rva + section.PointerToRawData - section.VirtualAddress;
 		}
 

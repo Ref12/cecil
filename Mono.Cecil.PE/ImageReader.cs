@@ -27,13 +27,15 @@ namespace Mono.Cecil.PE {
 		DataDirectory metadata;
 
 		uint table_heap_offset;
+		bool FromDump => image.FromDump;
 
-		public ImageReader (Disposable<Stream> stream, string file_name)
+		public ImageReader (Disposable<Stream> stream, string file_name, bool fromDump = false)
 			: base (stream.value)
 		{
 			image = new Image ();
 			image.Stream = stream;
 			image.FileName = file_name;
+			image.FromDump = fromDump;
 		}
 
 		void MoveTo (DataDirectory directory)
@@ -316,6 +318,12 @@ namespace Mono.Cecil.PE {
 				throw new BadImageFormatException ();
 
 			image.MetadataSection = section;
+            if (image.FromDump)
+            {
+				// The image comes from a dump. The pointer to raw data is used as an offset when reading certain values, but this
+				// is not valid when reading from a dump
+                image.MetadataSection.PointerToRawData = 0;
+            }
 
 			for (int i = 0; i < streams; i++)
 				ReadMetadataStream (section);
@@ -371,7 +379,10 @@ namespace Mono.Cecil.PE {
 		void ReadMetadataStream (Section section)
 		{
 			// Offset		4
-			uint offset = metadata.VirtualAddress - section.VirtualAddress + ReadUInt32 (); // relative to the section start
+			var relativeOffset = ReadUInt32 ();
+			uint offset = image.FromDump
+				? metadata.VirtualAddress + relativeOffset // relative to the metadata start
+                : metadata.VirtualAddress - section.VirtualAddress + relativeOffset; // relative to the section start
 
 			// Size			4
 			uint size = ReadUInt32 ();
@@ -756,10 +767,10 @@ namespace Mono.Cecil.PE {
 			}
 		}
 
-		public static Image ReadImage (Disposable<Stream> stream, string file_name)
+		public static Image ReadImage (Disposable<Stream> stream, string file_name, bool fromDump = false)
 		{
 			try {
-				var reader = new ImageReader (stream, file_name);
+				var reader = new ImageReader (stream, file_name, fromDump);
 				reader.ReadImage ();
 				return reader.image;
 			} catch (EndOfStreamException e) {
@@ -767,10 +778,10 @@ namespace Mono.Cecil.PE {
 			}
 		}
 
-		public static Image ReadPortablePdb (Disposable<Stream> stream, string file_name)
+		public static Image ReadPortablePdb (Disposable<Stream> stream, string file_name, bool fromDump = false)
 		{
 			try {
-				var reader = new ImageReader (stream, file_name);
+				var reader = new ImageReader (stream, file_name, fromDump);
 				var length = (uint) stream.value.Length;
 
 				reader.image.Sections = new[] {
