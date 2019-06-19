@@ -91,6 +91,9 @@ namespace Mono.Cecil.PE {
 
 		public uint ResolveVirtualAddress (RVA rva)
 		{
+			if (FromDump)
+				return rva;
+
 			var section = GetSectionAtVirtualAddress (rva);
 			if (section == null)
 				throw new ArgumentOutOfRangeException ();
